@@ -7,7 +7,8 @@ from src.utils import remove_outliers_iqr
 import pmdarima as pm
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.tsa.seasonal import seasonal_decompose
-
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import pickle
 # %% Load data
 data_folder = Path("data")
 data_train = pd.read_csv(data_folder / "illinois_basing_train.csv")
@@ -129,3 +130,38 @@ model = pm.auto_arima(
     suppress_warnings=True,
     stepwise=True,
 )
+#%% Print model summary
+print(model.summary())
+#%% Plot model diagnostics
+model.plot_diagnostics(figsize=(15, 10))
+plt.tight_layout()
+plt.show()
+#%% Predict with SARIMAX
+pred = model.predict(n_periods=len(data_test_2), X=data_test_2)
+#%% Load original test data
+y_test = pd.read_csv("data/illinois_basing_test_original.csv")
+y_test = y_test["inj_diff_Calculated"]
+# %% Plot the predictions for comparison
+plt.plot(data_test_2.index, pred, label="prediction")
+plt.plot(data_test_2.index, y_test, label="actual")
+plt.gcf().autofmt_xdate()
+plt.ylim(3, -3)
+plt.legend()
+plt.show()
+#%% Calculate the mean absolute error
+mae = mean_absolute_error(y_test[1:], pred[1:])
+print(f"Mean absolute error: {mae}")
+#%% Calculate the mean squared error
+mse = mean_squared_error(y_test[1:], pred[1:])
+print(f"Mean squared error: {mse}")
+#%% Export pred as csv with column name "inj_diff"
+pred = pd.DataFrame(pred, columns=["inj_diff"])
+pred.to_csv("data/pred.csv", index=False)
+#%% Put y_test and pred in one dataframe
+df_y_test = pd.DataFrame(y_test)
+df_y_test.index = data_test_2.index
+df_y_test.columns = ["inj_diff"]
+df_y_test["pred"] = pred.values
+#%% Save model to pickle file
+with open("model.pkl", "wb") as f:
+    pickle.dump(model, f)
