@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from src.utils import remove_outliers_iqr
+import pmdarima as pm
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 # %% Load data
 data_folder = Path("data")
@@ -54,10 +57,12 @@ plt.tight_layout()
 plt.show()
 # %% Remove outliers using IQ range for each column
 for col in data_train_2.columns:
-    data_train_2[col] = remove_outliers_iqr(data_train_2[col])
+    data_train_2[col] = remove_outliers_iqr(data_train_2[col], multiplier=5)
 # %% Interpolate missing values for each column
 for col in data_train_2.columns:
     data_train_2[col].interpolate(method="linear", inplace=True)
+# %% Drop nan values
+data_train_2.dropna(inplace=True)
 # %% Plot lineplot of all the columns in the data_train_2 in a different axes
 data_train_2.plot(linewidth=0.5, subplots=True, figsize=(10, 10))
 plt.tight_layout()
@@ -86,3 +91,41 @@ for i, col in enumerate(data_train_2.columns):
 plt.gcf().autofmt_xdate()
 plt.tight_layout()
 plt.show()
+#%% Select the values from 2012 onwards
+data_train_cut = data_train_2.loc["2012-01-01":]
+# %% Visualize the time series
+pm.tsdisplay(data_train_cut["inj_diff"], lag_max=100, figsize=(15, 10))
+plt.show()
+# %% Plot ACF and PACF
+fig_4, ax_4 = plt.subplots(2, 1)
+plot_acf(data_train_cut["inj_diff"], lags=50, ax=ax_4[0])
+plot_pacf(data_train_cut["inj_diff"], lags=50, ax=ax_4[1])
+plt.tight_layout()
+plt.show()
+# %% Decompose the time series
+decomposition = seasonal_decompose(data_train_cut["inj_diff"], period=24 * 7 * 4)
+fig_5 = decomposition.plot()
+fig_5.set_size_inches(15, 10)
+plt.tight_layout()
+plt.show()
+# %% Calculate difference between consecutive values
+D = pm.arima.utils.nsdiffs(
+    data_train_cut["inj_diff"], m=24, max_D=24, test="ch"
+)
+# %% Train with SARIMAX using pmdarima
+model = pm.auto_arima(
+    data_train_cut["inj_diff"],
+    X=data_train_cut.drop("inj_diff", axis=1),
+    start_p=0,
+    start_q=0,
+    max_p=5,
+    max_q=5,
+    m=24,
+    start_P=0,
+    seasonal=True,
+    D=D,
+    trace=True,
+    error_action="ignore",
+    suppress_warnings=True,
+    stepwise=True,
+)
