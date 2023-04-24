@@ -10,4 +10,5 @@ def remove_outliers_iqr(arr, multiplier=1.5):
     lower_bound = q1 - multiplier * iqr
     upper_bound = q3 + multiplier * iqr
     # Return the filtered array
-    return arr[(arr > lower_bound) & (arr < upper_bound)]
+    filt_arr = arr[(arr > lower_bound) & (arr < upper_bound)]
+    return filt_arr, lower_bound, upper_bound

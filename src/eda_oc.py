@@ -57,9 +57,17 @@ sns.heatmap(corr_2, vmin=-1, vmax=1, cmap="coolwarm", ax=ax_2)
 plt.suptitle("Correlation matrix")
 plt.tight_layout()
 plt.show()
-# %% Remove outliers using IQ range for each column
+# %% Remove outliers using IQ range for each column except inj_diff
+cols_imp = ["inj_diff", "Avg_PLT_CO2VentRate_TPH"]
+mult_all_col = 5
+mult_imp_col = 300
+
 for col in data_train_2.columns:
-    data_train_2[col] = remove_outliers_iqr(data_train_2[col], multiplier=300)
+    if col not in cols_imp:
+        data_train_2[col] = remove_outliers_iqr(data_train_2[col], multiplier=mult_all_col)
+    else:
+        data_train_2[col] = remove_outliers_iqr(data_train_2[col], multiplier=mult_imp_col)
+
 # %% Interpolate missing values for each column
 for col in data_train_2.columns:
     data_train_2[col].interpolate(method="linear", inplace=True)
@@ -113,7 +121,7 @@ plot_pacf(data_train_cut["inj_diff"], lags=50, ax=ax_4[1])
 plt.tight_layout()
 plt.show()
 # %% Decompose the time series
-decomposition = seasonal_decompose(data_train_cut["inj_diff"], period=24 * 7)
+decomposition = seasonal_decompose(data_train_cut["inj_diff"], period=24 * 7 * 4)
 fig_5 = decomposition.plot()
 fig_5.set_size_inches(15, 10)
 plt.tight_layout()
@@ -150,16 +158,15 @@ model = pm.ARIMA(
     enforce_invertibility=False,
 )
 #%%
-
 model.fit(data_train_cut["inj_diff"], data_train_cut.drop("inj_diff", axis=1))
 #%% Save model to pickle file
+model = model_auto
 with open("model.pkl", "wb") as f:
     pickle.dump(model, f)
 #%% Load model from pickle file
 with open("model.pkl", "rb") as f:
     model = pickle.load(f)
 #%% Print model summary
-model = model_auto
 print(model.summary())
 #%% Plot model diagnostics
 model.plot_diagnostics(figsize=(15, 10))
